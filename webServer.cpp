@@ -40,7 +40,7 @@ void setnonblocking(int sockfd) {
     int on = 1;
     int ret = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
     if(ret == -1)
-   {
+    {
          perror("setsockopt: SO_REUSEADDR");
          exit(-1);
     }
@@ -49,7 +49,7 @@ void setnonblocking(int sockfd) {
 int main(){
     struct epoll_event ev, events[MAX_EVENTS];
     socklen_t  addrlen;
-    int listenfd, conn_sock, nfds, epfd, fd, i, nread, n;
+    int listenfd, conn_sock, nfds, epfd, fd, i, nread, sockfd;
     struct sockaddr_in local, remote;
     char buf[BUFSIZ];
     threadpool<task> pool(20);
@@ -104,9 +104,7 @@ int main(){
                         perror("epoll_ctl: add");
                         exit(EXIT_FAILURE);
                     }
-                task *ta = new task(conn_sock);
-                    //向线程池添加任务
-                pool.append_task(ta);
+
                 }
                 if (conn_sock == -1) {
                     if (errno != EAGAIN && errno != ECONNABORTED
@@ -115,10 +113,18 @@ int main(){
                 }
                 continue;
             }
+             else if(events[i].events&EPOLLOUT || events[i].events&EPOLLIN)
+            {
+                 if ( (sockfd= events[i].data.fd) < 0)
+                      continue;
+                 ev.data.fd = sockfd;
+                 epoll_ctl(epfd,EPOLL_CTL_DEL,sockfd,&ev);
 
-                close(fd);
+                 task *ta = new task(sockfd);
+                    //向线程池添加任务
+                 pool.append_task(ta);
+
+
             }
-        }
-    return 0;
-    }
 
+     
